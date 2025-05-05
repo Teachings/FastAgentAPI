@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Wrapper Workflow Visualization v3</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Base durations (at 1x speed) */
+            --base-anim-step-duration: 1.0s;
+            --base-token-move-duration: 0.7s;
+            --base-line-draw-duration: 0.5s;
+            --base-node-pulse-duration: 1.0s;
+            --base-wait-duration: 0.8s;
+
+            /* Dynamic durations (modified by JS) */
+            --anim-step-duration: 1.0s;
+            --token-move-duration: 0.7s;
+            --line-draw-duration: 0.5s;
+            --node-pulse-duration: 1.0s;
+            --wait-duration: 0.8s;
+
+            /* Colors */
+            --node-bg: rgba(68, 138, 255, 0.15);
+            --node-border: rgba(68, 138, 255, 0.4);
+            --node-bg-active: rgba(68, 138, 255, 0.8);
+            --node-border-active: rgba(130, 177, 255, 1);
+            --node-shadow-active: 0 0 15px rgba(68, 138, 255, 0.7);
+            --node-decision-bg: rgba(255, 167, 38, 0.15); /* Orange for decisions */
+            --node-decision-border: rgba(255, 167, 38, 0.4);
+            --node-decision-bg-active: rgba(255, 167, 38, 0.8);
+            --node-decision-border-active: rgba(255, 204, 128, 1);
+            --node-decision-shadow-active: 0 0 15px rgba(255, 167, 38, 0.7);
+            --node-error-bg: rgba(239, 83, 80, 0.15); /* Red for error formatting */
+            --node-error-border: rgba(239, 83, 80, 0.4);
+            --node-error-bg-active: rgba(239, 83, 80, 0.8);
+            --node-error-border-active: rgba(255, 138, 128, 1);
+            --node-error-shadow-active: 0 0 15px rgba(239, 83, 80, 0.7);
+            --node-end-bg: rgba(102, 187, 106, 0.2); /* Green for end */
+            --node-end-border: rgba(102, 187, 106, 0.5);
+            --node-end-bg-active: rgba(102, 187, 106, 0.8);
+            --node-end-border-active: rgba(165, 214, 167, 1);
+            --node-end-shadow-active: 0 0 15px rgba(102, 187, 106, 0.7);
+
+            --request-color: #ff5252; /* Red request token */
+            --line-color-success: rgba(130, 177, 255, 0.8); /* Blue */
+            --line-color-error: rgba(239, 83, 80, 0.8); /* Red */
+            --line-color-retry: rgba(255, 167, 38, 0.8); /* Orange */
+            --line-color-default: rgba(255, 255, 255, 0.5);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 95%;
+            margin: 20px auto;
+            padding: 0;
+            box-sizing: border-box;
+            position: relative;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #4fc3f7;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+            font-size: 1.7rem;
+            line-height: 1.3;
+        }
+
+        /* Controls Area */
+        .controls-area {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .controls-area button,
+        .controls-area select,
+        .controls-area label {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .controls-area button:hover,
+        .controls-area select:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+        }
+        .controls-area button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .controls-area label {
+             border: none;
+             background: none;
+             padding-right: 5px;
+        }
+        .controls-area select {
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23ffffff%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 10px top 50%;
+            background-size: .65em auto;
+            padding-right: 30px;
+        }
+
+        .visualization-area {
+             width: 100%;
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             min-width: 0;
+        }
+
+        .workflow-graph-container {
+            position: relative;
+            width: 100%;
+            /* Increased Height for better spacing */
+            height: 850px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        /* Watermark */
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            /* Reduced font size */
+            font-size: 2.5vw;
+            color: rgba(255, 255, 255, 0.04);
+            font-weight: 700;
+            /* Allow wrapping */
+            white-space: normal;
+            line-height: 1.2; /* Adjust line height if needed */
+            text-align: center; /* Center wrapped text */
+            z-index: 1;
+            pointer-events: none;
+            user-select: none;
+        }
+
+
+        .node {
+            position: absolute;
+            width: 150px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background-color: var(--node-bg);
+            border: 1px solid var(--node-border);
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+            transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 50px;
+            z-index: 2;
+        }
+        .node .icon {
+             font-size: 1.2em;
+             margin-bottom: 3px;
+        }
+
+        .node.decision {
+            background-color: var(--node-decision-bg);
+            border-color: var(--node-decision-border);
+            border-radius: 50%; /* Make decision nodes circular */
+            width: 100px; /* Fixed size for circle */
+            height: 100px;
+            padding-top: 15px; /* Adjust padding for circle */
+            padding-bottom: 15px;
+        }
+         .node.error-format {
+             background-color: var(--node-error-bg);
+             border-color: var(--node-error-border);
+         }
+         .node.end-node {
+             background-color: var(--node-end-bg);
+             border-color: var(--node-end-border);
+             border-radius: 50%; /* Make end node circular */
+             width: 80px; /* Smaller circle */
+             height: 80px;
+         }
+
+
+        .node.active {
+            color: white;
+            transform: scale(1.05);
+            border-width: 2px;
+            background-color: var(--node-bg-active);
+            border-color: var(--node-border-active);
+            box-shadow: var(--node-shadow-active);
+            animation: pulse-node var(--node-pulse-duration) ease-in-out infinite alternate;
+        }
+         .node.decision.active {
+            background-color: var(--node-decision-bg-active);
+            border-color: var(--node-decision-border-active);
+            box-shadow: var(--node-decision-shadow-active);
+            animation-name: pulse-decision-node;
+         }
+         .node.error-format.active {
+             background-color: var(--node-error-bg-active);
+             border-color: var(--node-error-border-active);
+             box-shadow: var(--node-error-shadow-active);
+             animation-name: pulse-error-node;
+         }
+        .node.end-node.active {
+             background-color: var(--node-end-bg-active);
+             border-color: var(--node-end-border-active);
+             box-shadow: var(--node-end-shadow-active);
+             animation-name: pulse-end-node;
+         }
+
+
+        @keyframes pulse-node {
+            to { transform: scale(1.08); box-shadow: 0 0 20px rgba(68, 138, 255, 0.9); }
+        }
+        @keyframes pulse-decision-node {
+             to { transform: scale(1.08); box-shadow: 0 0 20px rgba(255, 167, 38, 0.9); }
+         }
+        @keyframes pulse-error-node {
+             to { transform: scale(1.08); box-shadow: 0 0 20px rgba(239, 83, 80, 0.9); }
+         }
+        @keyframes pulse-end-node {
+             to { transform: scale(1.08); box-shadow: 0 0 20px rgba(102, 187, 106, 0.9); }
+         }
+
+        #request-token {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background-color: var(--request-color);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--request-color);
+            z-index: 10;
+            transition: left var(--token-move-duration) ease-in-out,
+                        top var(--token-move-duration) ease-in-out,
+                        opacity 0.5s ease-in-out;
+            opacity: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.7rem;
+            color: white;
+            font-weight: bold;
+        }
+
+        #routing-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            overflow: visible; /* Ensure lines aren't clipped */
+        }
+
+        #routing-lines line {
+            stroke-width: 2;
+            stroke-dasharray: 7;
+            stroke-dashoffset: 100; /* Start fully dashed */
+            animation: draw-line var(--line-draw-duration) ease-out forwards;
+            opacity: 0; /* Start invisible */
+            stroke: var(--line-color-default);
+        }
+         #routing-lines line.success { stroke: var(--line-color-success); }
+         #routing-lines line.error { stroke: var(--line-color-error); }
+         #routing-lines line.retry { stroke: var(--line-color-retry); }
+
+
+        @keyframes draw-line {
+            to { stroke-dashoffset: 0; opacity: 1; }
+        }
+
+        /* Status Area */
+        .status-area {
+            width: auto;
+            max-width: 90%;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px 18px;
+            border-radius: 6px;
+            border: 1px solid rgba(79, 195, 247, 0.2);
+            text-align: left;
+        }
+
+        #status-text, #scenario-text {
+            min-height: 20px;
+            transition: opacity 0.5s ease-in-out;
+            opacity: 0;
+        }
+        #status-text.visible, #scenario-text.visible {
+            opacity: 1;
+        }
+
+        #status-text {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        #status-text strong { color: #82b1ff; }
+        #status-text .token-id { color: var(--request-color); font-weight: bold;}
+        #status-text .path-success { color: var(--line-color-success); }
+        #status-text .path-error { color: var(--line-color-error); }
+        #status-text .path-retry { color: var(--line-color-retry); }
+        #status-text .path-json { color: #ffcc80; }
+        #status-text .path-tool { color: #ba68c8; }
+        #status-text .path-text { color: #fff; }
+
+        #scenario-text {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-style: italic;
+        }
+        #scenario-text strong {
+            color: rgba(255, 255, 255, 0.9);
+            font-style: normal;
+        }
+
+
+        .attribution {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+             .workflow-graph-container { height: 800px; }
+             .watermark { font-size: 3vw; } /* Adjust watermark size */
+        }
+        @media (max-width: 768px) {
+             h1 { font-size: 1.4rem; }
+             .node { width: 120px; font-size: 0.7rem; padding: 6px 8px; min-height: 45px;}
+             .node.decision { width: 80px; height: 80px; padding-top: 10px; padding-bottom: 10px;}
+             .node.end-node { width: 65px; height: 65px; }
+             #request-token { width: 20px; height: 20px; font-size: 0.6rem;}
+             .workflow-graph-container { height: 850px; }
+             .status-area { max-width: 95%; }
+             #status-text { font-size: 0.8rem; }
+             #scenario-text { font-size: 0.75rem; }
+             .watermark { font-size: 4vw; } /* Adjust watermark size */
+             .controls-area { gap: 10px; }
+             .controls-area button, .controls-area select { font-size: 0.8rem; padding: 6px 10px;}
+        }
+         @media (max-width: 480px) {
+             h1 { font-size: 1.2rem; }
+             .node { width: 90px; font-size: 0.65rem; padding: 5px; min-height: 40px;}
+             .node.decision { width: 65px; height: 65px; padding-top: 8px; padding-bottom: 8px;}
+             .node.end-node { width: 50px; height: 50px; }
+             .workflow-graph-container { height: 800px; }
+             #status-text { font-size: 0.75rem; }
+             #scenario-text { font-size: 0.7rem; }
+             .watermark { font-size: 5vw; } /* Adjust watermark size */
+             .controls-area { flex-direction: column; align-items: stretch; }
+             .controls-area div { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px;}
+         }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LLM Wrapper Workflow Visualization v3</h1>
+
+        <div class="controls-area">
+             <div>
+                <button id="prevButton" title="Previous Scenario">⏮️ Prev</button>
+                <button id="playPauseButton" title="Play/Pause">▶️ Play</button>
+                <button id="nextButton" title="Next Scenario">Next ⏭️</button>
+            </div>
+             <div>
+                <label for="speedControl">Speed:</label>
+                <select id="speedControl">
+                    <option value="0.25">0.25x</option>
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                </select>
+             </div>
+        </div>
+
+        <div class="visualization-area">
+            <div class="workflow-graph-container" id="graphContainer">
+                <div class="watermark">Function Calling and Structured Response Wrapper<br>by Mukul Tripathi</div>
+
+                <div class="node" id="prepare_request"><span class="icon">📥</span>Prepare Request</div>
+                <div class="node" id="invoke_backend_llm"><span class="icon">☁️</span>Invoke Backend LLM</div>
+                <div class="node decision" id="check_llm_call_status"><span class="icon">❓</span>Check LLM Status</div>
+                <div class="node" id="wait_and_retry"><span class="icon">⏳</span>Wait & Retry</div>
+                <div class="node" id="route_by_format"><span class="icon">🔀</span>Route by Format</div>
+                <div class="node decision" id="route_on_response_format"><span class="icon">❓</span>Check Req. Format</div>
+
+                <div class="node" id="parse_and_validate_structured_json"><span class="icon">🧱</span>Parse & Validate JSON</div>
+                <div class="node decision" id="check_json_validation_result"><span class="icon">✔️</span>JSON Valid?</div>
+                <div class="node" id="format_structured_json_response"><span class="icon">📦</span>Format JSON Resp</div>
+
+                <div class="node" id="check_text_for_tool_calls"><span class="icon">🛠️</span>Check for Tools</div>
+                 <div class="node decision" id="route_text_mode_result"><span class="icon">✔️</span>Tools Found?</div>
+                <div class="node" id="format_tool_calls_response"><span class="icon">📦</span>Format Tool Resp</div>
+                <div class="node" id="format_plain_text_response"><span class="icon">📦</span>Format Text Resp</div>
+
+                <div class="node error-format" id="format_error_response"><span class="icon">⚠️</span>Format Error Resp</div>
+
+                <div class="node end-node" id="end"><span class="icon">🏁</span>END</div>
+
+                <div id="request-token">R1</div>
+                <svg id="routing-lines"></svg>
+            </div>
+             <div class="status-area">
+                <div id="status-text">Initializing...</div>
+                <div id="scenario-text">Scenario details will appear here.</div>
+             </div>
+        </div>
+
+        <div class="attribution">
+             Visualization Concept by Mukul Tripathi, Implemented by Gemini
+         </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const graphContainer = document.getElementById('graphContainer');
+        const requestToken = document.getElementById('request-token');
+        const routingLinesSvg = document.getElementById('routing-lines');
+        const statusTextElement = document.getElementById('status-text');
+        const scenarioTextElement = document.getElementById('scenario-text');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const prevButton = document.getElementById('prevButton');
+        const nextButton = document.getElementById('nextButton');
+        const speedControl = document.getElementById('speedControl');
+
+        // --- Node Configuration & Positioning ---
+        // *** Revised Layout for Logical Flow & Spacing ***
+        const nodes = {
+            // Level 1: Start
+            prepare_request:    { element: document.getElementById('prepare_request'),    x: 0, y: 3, next: 'invoke_backend_llm' },
+            // Level 2: Invoke LLM
+            invoke_backend_llm: { element: document.getElementById('invoke_backend_llm'), x: 0, y: 13, next: 'check_llm_call_status' },
+            // Level 3: Check LLM Status (Decision Point 1)
+            check_llm_call_status: { element: document.getElementById('check_llm_call_status'), x: 0, y: 24, type: 'decision', outcomes: { success: 'route_by_format', retry: 'wait_and_retry', error: 'format_error_response' } },
+            // Level 3a: Retry Path (Side)
+            wait_and_retry:        { element: document.getElementById('wait_and_retry'),        x: 35, y: 18, next: 'invoke_backend_llm', lineType: 'retry' }, // To the right, loops back up
+            // Level 4: Route Successful Response
+            route_by_format:         { element: document.getElementById('route_by_format'),         x: 0, y: 36, next: 'route_on_response_format' }, // Continue main flow
+            // Level 5: Check Requested Format (Decision Point 2)
+            route_on_response_format:{ element: document.getElementById('route_on_response_format'),x: 0, y: 48, type: 'decision', outcomes: { json: 'parse_and_validate_structured_json', text: 'check_text_for_tool_calls' } }, // Split point
+
+            // --- Branch 1: Text/Tool Processing (Left Side) ---
+            // Level 6 Left: Check for Tools
+            check_text_for_tool_calls: { element: document.getElementById('check_text_for_tool_calls'), x: -30, y: 60, next: 'route_text_mode_result' },
+            // Level 7 Left: Route Text/Tool Result (Decision Point 3)
+            route_text_mode_result:    { element: document.getElementById('route_text_mode_result'),    x: -30, y: 72, type: 'decision', outcomes: { tool: 'format_tool_calls_response', text: 'format_plain_text_response', error: 'format_error_response' } },
+            // Level 8 Left: Final Format Nodes
+            format_tool_calls_response:{ element: document.getElementById('format_tool_calls_response'),    x: -40, y: 84, next: 'end', lineType: 'success' },
+            format_plain_text_response:{ element: document.getElementById('format_plain_text_response'),    x: -15, y: 84, next: 'end', lineType: 'success' },
+
+            // --- Branch 2: JSON Processing (Right Side) ---
+            // Level 6 Right: Parse & Validate JSON
+            parse_and_validate_structured_json: { element: document.getElementById('parse_and_validate_structured_json'), x: 30, y: 60, next: 'check_json_validation_result' },
+            // Level 7 Right: Check JSON Validation (Decision Point 4)
+            check_json_validation_result:       { element: document.getElementById('check_json_validation_result'),       x: 30, y: 72, type: 'decision', outcomes: { success: 'format_structured_json_response', error: 'format_error_response' } },
+            // Level 8 Right: Final Format Node
+            format_structured_json_response:{ element: document.getElementById('format_structured_json_response'),x: 30, y: 84, next: 'end', lineType: 'success' },
+
+            // --- Common Error Formatting (Centered Below Level 7 Decisions) ---
+            format_error_response: { element: document.getElementById('format_error_response'), x: 0, y: 78, next: 'end', lineType: 'error' },
+
+            // --- Level 9: End Node (Bottom Center) ---
+            end: { element: document.getElementById('end'), x: 0, y: 96 } // Final convergence point
+        };
+
+
+        // --- Scenario Definitions ---
+        // *** Reordered based on user request ***
+        const scenarios = [
+            // R1
+            { id: 0, name: "Text Response (Success)", description: "Standard successful flow resulting in a plain text response." },
+            // R2
+            { id: 5, name: "Tool Call Response (Success)", description: "Successful flow where the LLM requests to use an application tool." },
+            // R3
+            { id: 1, name: "Retry Scenario", description: "Simulates a temporary backend error, followed by a successful retry and text response." },
+            // R4
+            { id: 3, name: "JSON Response (Success)", description: "Successful flow requesting and receiving a validated structured JSON response." },
+            // R5
+            { id: 4, name: "JSON Validation Error", description: "Simulates receiving JSON data that fails schema validation." },
+            // R6
+            { id: 2, name: "Fatal Error Scenario", description: "Simulates an unrecoverable error during the backend LLM call." },
+        ];
+        const totalScenarios = scenarios.length;
+
+         // --- State Variables ---
+        let currentNodeId = null;
+        let animationTimeoutId = null;
+        let requestCounter = 0;
+        let currentRetryCount = 0;
+        const MAX_RETRIES = 1;
+        let isPaused = true;
+        let currentSpeedFactor = 1.0;
+
+        // --- Positioning ---
+        function positionNodes() {
+            const containerWidth = graphContainer.offsetWidth;
+            const containerHeight = graphContainer.offsetHeight;
+
+            for (const id in nodes) {
+                const node = nodes[id];
+                if (node.element) {
+                    const nodeWidth = node.element.offsetWidth;
+                    const nodeHeight = node.element.offsetHeight;
+                    // Calculate position based on percentage (x: -50 to 50, y: 0 to 100)
+                    let leftPos = (node.x / 100 + 0.5) * containerWidth - (nodeWidth / 2);
+                    let topPos = (node.y / 100) * containerHeight;
+
+                     // Clamp positions to stay within container bounds with padding
+                     leftPos = Math.max(5, Math.min(leftPos, containerWidth - nodeWidth - 5));
+                     topPos = Math.max(5, Math.min(topPos, containerHeight - nodeHeight - 5)); // Use 5px padding bottom
+
+
+                    node.element.style.left = `${leftPos}px`;
+                    node.element.style.top = `${topPos}px`;
+
+                    // Store calculated center coordinates relative to the container for line drawing
+                    const elementRect = node.element.getBoundingClientRect();
+                    const containerRect = graphContainer.getBoundingClientRect();
+                     node.centerX = elementRect.left - containerRect.left + elementRect.width / 2;
+                     node.centerY = elementRect.top - containerRect.top + elementRect.height / 2;
+
+                } else {
+                     console.error(`Element not found for node: ${id}`);
+                }
+            }
+        }
+
+
+        // --- Helper Functions ---
+        function getNodeCenter(nodeId) {
+             const node = nodes[nodeId];
+             // Check if node exists and center coordinates are calculated
+             if (!node || !node.element || node.centerX === undefined || node.centerY === undefined) {
+                 console.warn(`Node center not ready or node not found: ${nodeId}. Recalculating...`);
+                 // Attempt to recalculate on the fly if needed (e.g., if called before initial positioning)
+                 if (node && node.element) {
+                     const elementRect = node.element.getBoundingClientRect();
+                     const containerRect = graphContainer.getBoundingClientRect();
+                     return {
+                         x: elementRect.left - containerRect.left + elementRect.width / 2,
+                         y: elementRect.top - containerRect.top + elementRect.height / 2
+                     };
+                 }
+                 // Fallback if node or element doesn't exist
+                 return { x: 0, y: 0 };
+             }
+             return { x: node.centerX, y: node.centerY };
+        }
+
+        function drawRoutingLine(fromNodeId, toNodeId, lineType = 'default') {
+            const start = getNodeCenter(fromNodeId);
+            const end = getNodeCenter(toNodeId);
+
+            // Validate coordinates before drawing
+            if (isNaN(start.x) || isNaN(start.y) || isNaN(end.x) || isNaN(end.y)) {
+                console.error(`Invalid coordinates for drawing line from ${fromNodeId} to ${toNodeId}`);
+                return;
+            }
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', start.x);
+            line.setAttribute('y1', start.y);
+            // Start the line at the source node's center for the animation effect
+            line.setAttribute('x2', start.x);
+            line.setAttribute('y2', start.y);
+            line.classList.add(lineType); // Apply style class (success, error, retry, default)
+            routingLinesSvg.appendChild(line);
+
+            // Use requestAnimationFrame to ensure the line is added to the DOM before starting the transition
+            requestAnimationFrame(() => {
+                 const lineDrawDuration = getComputedStyle(document.documentElement).getPropertyValue('--line-draw-duration');
+                 // Animate the end point (x2, y2) and opacity/dashoffset
+                 line.style.transition = `x2 ${lineDrawDuration} ease-out, y2 ${lineDrawDuration} ease-out, stroke-dashoffset ${lineDrawDuration} ease-out, opacity ${lineDrawDuration} ease-out`;
+                 line.setAttribute('x2', end.x);
+                 line.setAttribute('y2', end.y);
+                 line.style.strokeDashoffset = '0'; // Animate dash offset to 0 for drawing effect
+                 line.style.opacity = '1'; // Fade in the line
+             });
+        }
+
+        function updateStatus(text, highlightClass = '') {
+             // Display current request number and status message
+             statusTextElement.innerHTML = `<strong class="token-id">R${requestCounter + 1}:</strong> ${text}`;
+             statusTextElement.className = 'visible'; // Make status visible
+             // Add optional highlight class (e.g., for path type)
+             if (highlightClass) {
+                 statusTextElement.classList.add(highlightClass);
+             }
+        }
+
+        function updateScenarioDisplay() {
+            // Update the scenario description text
+            const currentScenario = scenarios[requestCounter % totalScenarios];
+            scenarioTextElement.innerHTML = `Current Scenario: <strong>${currentScenario.name}</strong> (${currentScenario.description})`;
+            scenarioTextElement.classList.add('visible');
+            // Update the text content of the request token
+            requestToken.textContent = `R${requestCounter + 1}`;
+        }
+
+        function updateAnimationSpeed(speedFactor) {
+            currentSpeedFactor = speedFactor;
+            const root = document.documentElement;
+            // Get base durations from CSS variables (or default values)
+            const baseStep = parseFloat(root.style.getPropertyValue('--base-anim-step-duration') || 1.0);
+            const baseMove = parseFloat(root.style.getPropertyValue('--base-token-move-duration') || 0.7);
+            const baseDraw = parseFloat(root.style.getPropertyValue('--base-line-draw-duration') || 0.5);
+            const basePulse = parseFloat(root.style.getPropertyValue('--base-node-pulse-duration') || 1.0);
+            const baseWait = parseFloat(root.style.getPropertyValue('--base-wait-duration') || 0.8);
+
+            // Calculate and set the actual animation durations based on the speed factor
+            root.style.setProperty('--anim-step-duration', `${baseStep / speedFactor}s`);
+            root.style.setProperty('--token-move-duration', `${baseMove / speedFactor}s`);
+            root.style.setProperty('--line-draw-duration', `${baseDraw / speedFactor}s`);
+            root.style.setProperty('--node-pulse-duration', `${basePulse / speedFactor}s`);
+            root.style.setProperty('--wait-duration', `${baseWait / speedFactor}s`);
+
+            // Update the transition property for the request token to use the new duration
+            requestToken.style.transition = `left var(--token-move-duration) ease-in-out, top var(--token-move-duration) ease-in-out, opacity 0.5s ease-in-out`;
+        }
+
+        // --- Playback Controls ---
+        function playAnimation() {
+            if (!isPaused) return; // Already playing
+            isPaused = false;
+            playPauseButton.textContent = '⏸️ Pause';
+            playPauseButton.title = 'Pause';
+            // If animation was paused mid-flow, resume from current node
+            if (currentNodeId && currentNodeId !== 'end') {
+                 runWorkflowStep();
+            } else { // Otherwise, start from the beginning
+                 startAnimation();
+            }
+        }
+
+        function pauseAnimation() {
+            if (isPaused) return; // Already paused
+            isPaused = true;
+            playPauseButton.textContent = '▶️ Play';
+            playPauseButton.title = 'Play';
+            clearTimeout(animationTimeoutId); // Stop any pending animation step
+        }
+
+        function togglePlayPause() {
+            if (isPaused) {
+                playAnimation();
+            } else {
+                pauseAnimation();
+            }
+        }
+
+        function nextScenario() {
+            requestCounter++;
+            // Loop back to the first scenario if we go past the last one
+            if (requestCounter >= totalScenarios) requestCounter = 0;
+            isPaused = true; // Always start new scenario paused
+            playPauseButton.textContent = '▶️ Play';
+            playPauseButton.title = 'Play';
+            startAnimation(true); // Force reset and start the new scenario
+        }
+
+        function previousScenario() {
+            requestCounter--;
+            // Loop back to the last scenario if we go before the first one
+            if (requestCounter < 0) requestCounter = totalScenarios - 1;
+            isPaused = true; // Always start new scenario paused
+            playPauseButton.textContent = '▶️ Play';
+             playPauseButton.title = 'Play';
+            startAnimation(true); // Force reset and start the new scenario
+        }
+
+
+        // --- Core Animation Logic ---
+        function runWorkflowStep() {
+            if (isPaused) return; // Don't run if paused
+
+            clearTimeout(animationTimeoutId); // Clear any previous timeout
+            const currentNode = nodes[currentNodeId];
+
+            // Safety check for current node
+            if (!currentNode || !currentNode.element) {
+                 console.error("Error: Current node or element not found", currentNodeId);
+                 pauseAnimation();
+                 return;
+            }
+
+            // --- Visual Updates for Current Step ---
+            // Deactivate previously active node(s)
+            document.querySelectorAll('.node.active').forEach(el => el.classList.remove('active'));
+            // Activate the current node
+            currentNode.element.classList.add('active');
+            // Ensure the request token is visible
+            requestToken.style.opacity = '1';
+
+            // Position the request token at the center of the current node
+            const center = getNodeCenter(currentNodeId);
+             if (isNaN(center.x) || isNaN(center.y)) {
+                 console.error(`Invalid center for token positioning at ${currentNodeId}`);
+                 pauseAnimation();
+                 return;
+             }
+            requestToken.style.left = `${center.x - requestToken.offsetWidth / 2}px`;
+            requestToken.style.top = `${center.y - requestToken.offsetHeight / 2}px`;
+
+            // --- Determine Next Step Based on Logic & Scenario ---
+            let nextNodeId = null;
+            let decisionOutcome = null; // For decision nodes
+            let statusUpdate = ""; // Text for the status area
+            let lineType = currentNode.lineType || 'default'; // Line style (success, error, retry)
+            const scenarioIndex = requestCounter % totalScenarios; // Get the current scenario INDEX
+            const currentScenario = scenarios[scenarioIndex]; // Get the current scenario OBJECT
+
+            // --- Decision Logic ---
+            // *** Use currentScenario.id for checks instead of scenarioIndex ***
+            if (currentNode.type === 'decision') {
+                 // Decision 1: After LLM Call
+                 if (currentNodeId === 'check_llm_call_status') {
+                     // Retry Scenario (ID 1)
+                     if (currentRetryCount < MAX_RETRIES && currentScenario.id === 1) {
+                         decisionOutcome = 'retry'; nextNodeId = currentNode.outcomes.retry; statusUpdate = `LLM call failed (<span class="path-retry">Retryable Error ${currentRetryCount+1}/${MAX_RETRIES}</span>). Waiting...`; lineType = 'retry'; currentRetryCount++;
+                     // Fatal Error Scenario (ID 2)
+                     } else if (currentScenario.id === 2) {
+                         decisionOutcome = 'error'; nextNodeId = currentNode.outcomes.error; statusUpdate = `LLM call failed (<span class="path-error">Fatal Error</span>). Routing to error handling.`; lineType = 'error';
+                     // All other scenarios: Success
+                     } else {
+                         decisionOutcome = 'success'; nextNodeId = currentNode.outcomes.success; statusUpdate = `LLM call <span class="path-success">Successful</span>. Routing by format...`; lineType = 'success'; currentRetryCount = 0; // Reset retry count on success
+                     }
+                 // Decision 2: Route based on requested format
+                 } else if (currentNodeId === 'route_on_response_format') {
+                     // JSON Scenarios (ID 3 or 4)
+                     if (currentScenario.id === 3 || currentScenario.id === 4) {
+                         decisionOutcome = 'json'; nextNodeId = currentNode.outcomes.json; statusUpdate = `Request type is <span class="path-json">JSON Object</span>. Parsing...`; lineType = 'success';
+                     // Text/Tool Scenarios (ID 0, 5, 1, 2)
+                     } else {
+                         decisionOutcome = 'text'; nextNodeId = currentNode.outcomes.text; statusUpdate = `Request type is <span class="path-text">Text/Tool</span>. Checking for tools...`; lineType = 'success';
+                     }
+                 // Decision 3: Check JSON validation result
+                 } else if (currentNodeId === 'check_json_validation_result') {
+                      // JSON Validation Error Scenario (ID 4)
+                      if (currentScenario.id === 4) {
+                          decisionOutcome = 'error'; nextNodeId = currentNode.outcomes.error; statusUpdate = `JSON <span class="path-error">Validation Failed</span>. Routing to error handling.`; lineType = 'error';
+                      // JSON Success Scenario (ID 3)
+                      } else {
+                          decisionOutcome = 'success'; nextNodeId = currentNode.outcomes.success; statusUpdate = `JSON <span class="path-success">Validation Successful</span>. Formatting response...`; lineType = 'success';
+                      }
+                 // Decision 4: Check if tool calls were found in text mode
+                 } else if (currentNodeId === 'route_text_mode_result') {
+                       // Tool Call Scenario (ID 5)
+                       if (currentScenario.id === 5) {
+                          decisionOutcome = 'tool'; nextNodeId = currentNode.outcomes.tool; statusUpdate = `<span class="path-tool">Tool Call Detected</span>. Formatting response...`; lineType = 'success';
+                       }
+                       // Plain Text Scenarios (ID 0, 1, 2 reaching here)
+                       else {
+                          decisionOutcome = 'text'; nextNodeId = currentNode.outcomes.text; statusUpdate = `<span class="path-text">Plain Text Detected</span>. Formatting response...`; lineType = 'success';
+                       }
+                 // Fallback for unexpected decision nodes
+                 } else {
+                     nextNodeId = Object.values(currentNode.outcomes)[0]; statusUpdate = `Decision at ${currentNodeId}. Moving to ${nextNodeId}.`;
+                 }
+
+            // --- Standard Node Logic ---
+            } else {
+                nextNodeId = currentNode.next; // Get the next node ID from the configuration
+                // Set default status messages for standard nodes
+                statusUpdate = `Processing step: <strong>${currentNodeId.replace(/_/g, ' ')}</strong>.`; // Default status
+                if (currentNodeId === 'prepare_request') statusUpdate = "Received request. Preparing payload...";
+                if (currentNodeId === 'invoke_backend_llm') statusUpdate = "Sending request to backend LLM...";
+                if (currentNodeId === 'wait_and_retry') statusUpdate = `Waiting ${getComputedStyle(document.documentElement).getPropertyValue('--wait-duration') || '0.8s'} before retry...`;
+                 if (currentNodeId === 'end') statusUpdate = "Workflow Complete. Final response ready."; // Should not be reached here, but for safety
+            }
+
+            // Update the status display area
+            updateStatus(statusUpdate);
+
+            // --- Transition to Next Step ---
+            if (nextNodeId && nextNodeId !== 'end') {
+                 const nextNode = nodes[nextNodeId];
+                 // Safety check for next node
+                 if (!nextNode || !nextNode.element) {
+                     console.error("Error: Next node or element not found", nextNodeId);
+                      pauseAnimation(); return;
+                 }
+
+                // Get center of the next node for token movement
+                const nextCenter = getNodeCenter(nextNodeId);
+                 if (isNaN(nextCenter.x) || isNaN(nextCenter.y)) {
+                     console.error(`Invalid center for next node ${nextNodeId}`);
+                     pauseAnimation(); return;
+                 }
+
+                 // Draw the line connecting current to next node
+                 drawRoutingLine(currentNodeId, nextNodeId, lineType);
+
+                // Short delay after drawing line starts, before moving token
+                setTimeout(() => {
+                    if (isPaused) return; // Check if paused during the short delay
+
+                    // Move the token to the center of the next node
+                    const tokenMoveDurationMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--token-move-duration') || '0.7') * 1000;
+                    requestToken.style.left = `${nextCenter.x - requestToken.offsetWidth / 2}px`;
+                    requestToken.style.top = `${nextCenter.y - requestToken.offsetHeight / 2}px`;
+
+                    // Calculate delay before executing the logic of the *next* step
+                    let stepDelayMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--anim-step-duration') || '1.0') * 1000;
+                    // Add extra wait time if the current node is 'wait_and_retry'
+                    if (currentNodeId === 'wait_and_retry') {
+                         stepDelayMs += parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--wait-duration') || '0.8') * 1000;
+                     }
+
+                    // Update the current node ID
+                    currentNodeId = nextNodeId;
+                    // Schedule the next step execution after the calculated delay
+                    animationTimeoutId = setTimeout(runWorkflowStep, stepDelayMs);
+
+                }, 50); // Small delay (50ms) to ensure line animation starts
+
+            // --- Reached the End Node ---
+            } else if (nextNodeId === 'end') {
+                 const endCenter = getNodeCenter('end');
+                  if (isNaN(endCenter.x) || isNaN(endCenter.y)) {
+                     console.error("Invalid center for end node");
+                     pauseAnimation(); return;
+                 }
+                 // Draw the final line to the end node
+                 drawRoutingLine(currentNodeId, 'end', lineType);
+
+                 // Short delay after drawing line starts
+                 setTimeout(() => {
+                    if (isPaused) return;
+
+                     // Move the token to the end node
+                     const tokenMoveDurationMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--token-move-duration') || '0.7') * 1000;
+                     requestToken.style.left = `${endCenter.x - requestToken.offsetWidth / 2}px`;
+                     requestToken.style.top = `${endCenter.y - requestToken.offsetHeight / 2}px`;
+
+                     // After the token arrives at the end node
+                     animationTimeoutId = setTimeout(() => {
+                         if (isPaused) return;
+
+                         // Deactivate the previous node, activate the end node
+                         document.querySelectorAll('.node.active').forEach(el => el.classList.remove('active'));
+                         nodes.end.element.classList.add('active');
+                         // Set final status message (colored based on outcome)
+                         updateStatus(`Workflow <span class='${lineType === 'error' ? 'path-error' : 'path-success'}'>Complete</span>. Final response ready.`);
+                         pauseAnimation(); // Stop the animation
+
+                     }, tokenMoveDurationMs); // Wait for token movement to finish
+
+                 }, 50); // Small delay
+
+            // --- Unexpected End of Path ---
+            } else {
+                console.log("Workflow path ended unexpectedly at:", currentNodeId);
+                pauseAnimation();
+            }
+        }
+
+
+        // --- Initialization ---
+        function startAnimation(forceReset = false) {
+             // Don't restart if already playing unless forced
+             if (!isPaused && !forceReset) return;
+
+             // --- Reset State ---
+             clearTimeout(animationTimeoutId); // Clear any pending step
+             routingLinesSvg.innerHTML = ''; // Clear old lines
+             document.querySelectorAll('.node.active').forEach(el => el.classList.remove('active')); // Deactivate nodes
+             requestToken.style.opacity = '0'; // Hide token initially
+             statusTextElement.classList.remove('visible'); // Hide status
+             scenarioTextElement.classList.remove('visible'); // Hide scenario text
+             statusTextElement.innerHTML = "Initializing..."; // Reset status text
+
+             currentRetryCount = 0; // Reset retries for the new run
+             currentNodeId = 'prepare_request'; // Set starting node
+
+             // --- Setup for New Run ---
+             updateScenarioDisplay(); // Show current scenario info
+             updateAnimationSpeed(parseFloat(speedControl.value)); // Apply selected speed
+
+             // Calculate and apply node positions *before* placing the token
+             positionNodes();
+
+             // Short delay to allow elements to render before starting animation/placing token
+             setTimeout(() => {
+                 statusTextElement.classList.add('visible'); // Show "Initializing..." or "Ready..."
+                 // If set to play immediately
+                 if (!isPaused) {
+                     runWorkflowStep(); // Start the workflow
+                 } else { // If starting in paused state
+                     const startCenter = getNodeCenter(currentNodeId);
+                      // Place the token at the start node if coordinates are valid
+                      if (!isNaN(startCenter.x) && !isNaN(startCenter.y)) {
+                         requestToken.style.left = `${startCenter.x - requestToken.offsetWidth / 2}px`;
+                         requestToken.style.top = `${startCenter.y - requestToken.offsetHeight / 2}px`;
+                         requestToken.style.opacity = '1'; // Make token visible
+                         // Activate the starting node visually
+                         if (nodes[currentNodeId] && nodes[currentNodeId].element) {
+                            nodes[currentNodeId].element.classList.add('active');
+                         }
+                         // Update status to indicate readiness
+                         updateStatus(`Ready to start scenario ${requestCounter + 1}. Press Play.`);
+                      } else {
+                          // Error handling if start node position is invalid
+                          console.error("Could not get valid start node center on init.");
+                          updateStatus("Error initializing visualization.");
+                      }
+                 }
+             }, 300); // Delay (300ms) for rendering and setup
+         }
+
+        // --- Event Listeners ---
+        playPauseButton.addEventListener('click', togglePlayPause);
+        nextButton.addEventListener('click', nextScenario);
+        prevButton.addEventListener('click', previousScenario);
+        speedControl.addEventListener('change', (event) => {
+            // Update speed immediately when changed
+            updateAnimationSpeed(parseFloat(event.target.value));
+        });
+
+        // Initial setup on window load
+        window.addEventListener('load', () => {
+             // Store the initial CSS duration values as base values
+             const rootStyle = getComputedStyle(document.documentElement);
+             document.documentElement.style.setProperty('--base-anim-step-duration', rootStyle.getPropertyValue('--anim-step-duration').trim() || '1.0s');
+             document.documentElement.style.setProperty('--base-token-move-duration', rootStyle.getPropertyValue('--token-move-duration').trim() || '0.7s');
+             document.documentElement.style.setProperty('--base-line-draw-duration', rootStyle.getPropertyValue('--line-draw-duration').trim() || '0.5s');
+             document.documentElement.style.setProperty('--base-node-pulse-duration', rootStyle.getPropertyValue('--node-pulse-duration').trim() || '1.0s');
+             document.documentElement.style.setProperty('--base-wait-duration', rootStyle.getPropertyValue('--wait-duration').trim() || '0.8s');
+
+             // Start in a paused state
+             isPaused = true;
+             playPauseButton.textContent = '▶️ Play';
+             playPauseButton.title = 'Play';
+             startAnimation(true); // Initialize the first scenario (paused)
+         });
+
+        // Handle window resizing
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+             clearTimeout(resizeTimeout); // Debounce resize events
+             pauseAnimation(); // Pause animation during resize
+             // Recalculate positions after a short delay when resizing stops
+             resizeTimeout = setTimeout(() => {
+                 positionNodes(); // Reposition all nodes based on new container size
+                 // Reposition the token to the current node's new center
+                 if (currentNodeId) {
+                     const center = getNodeCenter(currentNodeId);
+                     if (!isNaN(center.x) && !isNaN(center.y)) {
+                         // Use direct style update, no transition during resize adjustment
+                         requestToken.style.transition = 'none';
+                         requestToken.style.left = `${center.x - requestToken.offsetWidth / 2}px`;
+                         requestToken.style.top = `${center.y - requestToken.offsetHeight / 2}px`;
+                         // Restore transition after a brief moment
+                         requestAnimationFrame(() => {
+                            requestAnimationFrame(() => { // Double RAF to ensure transition is re-applied
+                                updateAnimationSpeed(currentSpeedFactor); // Re-apply speed to reset transition property
+                            });
+                         });
+                     } else {
+                         console.error(`Could not get valid node center for ${currentNodeId} after resize.`);
+                     }
+                 }
+             }, 250); // Wait 250ms after last resize event
+        });
+
+    </script>
+</body>
+</html>

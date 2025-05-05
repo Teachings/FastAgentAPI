@@ -1,0 +1,12 @@
+# requirements.txt
+fastapi
+uvicorn[standard]
+httpx
+langgraph
+langchain_core
+jsonschema
+python-dotenv
+# pathlib # Included in Python 3.4+ standard library, no need to list
+
+# Optional, requires system library (graphviz)
+# pygraphviz
