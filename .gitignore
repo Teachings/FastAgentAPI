@@ -39,6 +39,7 @@ pip-delete-this-directory.txt
 
 #logs
 host_logs/
+logs
 
 
 # Unit test / coverage reports
@@ -93,7 +94,7 @@ celerybeat-schedule
 *.sage.py
 
 # Environments
-# .env
+.env
 .venv
 env.bash
 local.env
