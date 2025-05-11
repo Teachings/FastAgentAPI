@@ -7,7 +7,7 @@ from openai import OpenAI, APIError
 from termcolor import colored
 
 WRAPPER_BASE_URL = os.environ.get("WRAPPER_URL", "http://localhost:8002/v1")
-TARGET_MODEL_NAME = os.environ.get("TARGET_MODEL", "your-backend-model-name")
+TARGET_MODEL_NAME = os.environ.get("TARGET_MODEL", "qwen3:30b")
 WRAPPER_API_KEY = os.environ.get("WRAPPER_API_KEY", "dummy-key-for-wrapper")
 
 class UserInfoSchema(BaseModel):

@@ -132,7 +132,7 @@ This is the recommended way to run the application in production or testing envi
         This maps host port `8003` to the *fixed* container port `8000`, uses a *different* backend URL, and logs to a separate file, also mapped to the host.
         ```bash
         docker run -d --rm --name fastagentapi-instance2 \
-          -p 8003:8000 \
+          -p 10003:8000 \
           -e BACKEND_API_URL="http://192.168.1.11:10002/v1" \
           -e LOG_FILE_PATH="/app/logs/instance2.log" \
           -e BACKEND_API_KEY="<backend2_key_if_needed>" \

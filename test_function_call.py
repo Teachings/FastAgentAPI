@@ -5,8 +5,8 @@ from openai import OpenAI, APIError
 from termcolor import colored
 
 # --- Configuration ---
-WRAPPER_BASE_URL = os.environ.get("WRAPPER_URL", "http://localhost:8002/v1")
-TARGET_MODEL_NAME = os.environ.get("TARGET_MODEL", "llama3.2")
+WRAPPER_BASE_URL = os.environ.get("WRAPPER_URL", "http://localhost:10003/v1")
+TARGET_MODEL_NAME = os.environ.get("TARGET_MODEL", "DeepSeek-V3-0324")
 WRAPPER_API_KEY = os.environ.get("WRAPPER_API_KEY", "sk-1111")
 
 # --- Tool Definitions ---
@@ -22,7 +22,7 @@ multi_tools = [
                     "location": {"type": "string"},
                     "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
                 },
-                "required": ["location"]
+                "required": ["location", "unit"]
             }
         }
     },
