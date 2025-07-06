@@ -268,11 +268,14 @@ async def prepare_request(state: GraphState) -> Dict[str, Any]:
             **payload_extras,
             "stream": False,
         }
-        if response_format_type == "text":
-            if tools_from_client:
-                backend_payload["tools"] = tools_from_client
-            if tool_choice_from_client:
-                backend_payload["tool_choice"] = tool_choice_from_client
+        # Note: For text mode with tool calling, we handle tools via prompts
+        # Don't pass tools/tool_choice to backend if it doesn't support them
+        # Comment out the following lines to use text-based tool calling:
+        # if response_format_type == "text":
+        #     if tools_from_client:
+        #         backend_payload["tools"] = tools_from_client
+        #     if tool_choice_from_client:
+        #         backend_payload["tool_choice"] = tool_choice_from_client
         logger.info(f"Prepared backend payload for model: {model_name}, Format Mode: {response_format_type}")
 
     return {
