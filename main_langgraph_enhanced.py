@@ -203,7 +203,17 @@ def _prepare_prompt_messages(messages: List[Dict[str, Any]], tools: Optional[Lis
     system_message_found = False
     for msg in modified_messages_with_tool_prompt:
         if msg.get("role") == "system":
-            msg["content"] = msg.get("content", "") + tool_descriptions + instructions
+            current_content = msg.get("content", "")
+            if isinstance(current_content, list):
+                # Handle list content format - extract text from content parts
+                text_content = ""
+                for part in current_content:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        text_content += part.get("text", "")
+                    elif isinstance(part, str):
+                        text_content += part
+                current_content = text_content
+            msg["content"] = current_content + tool_descriptions + instructions
             system_message_found = True; break
     if not system_message_found:
         modified_messages_with_tool_prompt.insert(0, {"role": "system", "content": (tool_descriptions + instructions).strip()})
