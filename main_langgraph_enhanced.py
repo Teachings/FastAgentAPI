@@ -203,7 +203,17 @@ def _prepare_prompt_messages(messages: List[Dict[str, Any]], tools: Optional[Lis
     system_message_found = False
     for msg in modified_messages_with_tool_prompt:
         if msg.get("role") == "system":
-            msg["content"] = msg.get("content", "") + tool_descriptions + instructions
+            current_content = msg.get("content", "")
+            if isinstance(current_content, list):
+                # Handle list content format - extract text from content parts
+                text_content = ""
+                for part in current_content:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        text_content += part.get("text", "")
+                    elif isinstance(part, str):
+                        text_content += part
+                current_content = text_content
+            msg["content"] = current_content + tool_descriptions + instructions
             system_message_found = True; break
     if not system_message_found:
         modified_messages_with_tool_prompt.insert(0, {"role": "system", "content": (tool_descriptions + instructions).strip()})
@@ -268,11 +278,14 @@ async def prepare_request(state: GraphState) -> Dict[str, Any]:
             **payload_extras,
             "stream": False,
         }
-        if response_format_type == "text":
-            if tools_from_client:
-                backend_payload["tools"] = tools_from_client
-            if tool_choice_from_client:
-                backend_payload["tool_choice"] = tool_choice_from_client
+        # Note: For text mode with tool calling, we handle tools via prompts
+        # Don't pass tools/tool_choice to backend if it doesn't support them
+        # Comment out the following lines to use text-based tool calling:
+        # if response_format_type == "text":
+        #     if tools_from_client:
+        #         backend_payload["tools"] = tools_from_client
+        #     if tool_choice_from_client:
+        #         backend_payload["tool_choice"] = tool_choice_from_client
         logger.info(f"Prepared backend payload for model: {model_name}, Format Mode: {response_format_type}")
 
     return {
