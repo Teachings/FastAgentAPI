@@ -6,6 +6,9 @@ langgraph
 langchain_core
 jsonschema
 python-dotenv
+# needed for test_function_call.py
+openai
+termcolor
 # pathlib # Included in Python 3.4+ standard library, no need to list
 
 # Optional, requires system library (graphviz)
